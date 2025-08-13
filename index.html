@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Code Review Tool</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>Code Review Tool</h1>
+                <div class="input-section">
+                    <input
+                        type="text"
+                        id="repoInput"
+                        placeholder="Enter GitHub repo URL (e.g. https://github.com/CragglesG/code-review)"
+                    />
+                    <button id="loadRepoBtn">Load Repository</button>
+                    <button id="darkModeToggle" class="secondary-btn">
+                        🌙
+                    </button>
+                </div>
+            </header>
+
+            <main>
+                <div id="loadingIndicator" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Loading repository data...</p>
+                </div>
+
+                <div id="errorMessage" class="error-message hidden">
+                    <p></p>
+                </div>
+
+                <div id="repoInfo" class="repo-info hidden">
+                    <h2 id="repoTitle"></h2>
+                    <p id="repoDescription"></p>
+                    <div class="controls">
+                        <label for="branchSelect">Branch:</label>
+                        <select id="branchSelect">
+                            <option value="main">main</option>
+                        </select>
+                        <label for="commitLimit">Max Commits:</label>
+                        <select id="commitLimit">
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="unlimited">Unlimited</option>
+                        </select>
+                        <button id="refreshBtn">Refresh</button>
+                        <button id="expandAllBtn" class="secondary-btn">
+                            Expand All
+                        </button>
+                        <button id="collapseAllBtn" class="secondary-btn">
+                            Collapse All
+                        </button>
+                    </div>
+                </div>
+
+                <div id="diffMatrix" class="diff-matrix hidden">
+                    <div class="matrix-container">
+                        <table id="diffTable">
+                            <thead>
+                                <tr>
+                                    <th class="file-header sticky-header">
+                                        Files
+                                    </th>
+                                    <!-- Commit headers will be populated here -->
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- File rows and diff cells will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <script src="script.js"></script>
+    </body>
+</html>

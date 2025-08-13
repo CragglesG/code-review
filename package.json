@@ -1,0 +1,43 @@
+{
+  "name": "code-review-tool",
+  "version": "1.0.0",
+  "description": "A web application that visualizes the differences between commits in a GitHub repository.",
+  "main": "server.js",
+  "scripts": {
+    "install": "node install.js",
+    "start": "node server.js",
+    "dev": "node server.js",
+    "serve": "python server.py",
+    "setup": "node install.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "github",
+    "git",
+    "diff",
+    "commit",
+    "visualization",
+    "matrix",
+    "web-app",
+    "javascript"
+  ],
+  "author": "Craig Giles",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CragglesG/code-review"
+  },
+  "bugs": {
+    "url": "https://github.com/CragglesG/code-review/issues"
+  },
+  "homepage": "https://github.com/CragglesG/code-review",
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
