@@ -9,10 +9,13 @@ class GitHubDiffViewer {
     this.initializeElements();
     this.loadConfig();
     this.bindEvents();
-    this.handleAuthCallback();
     this.initializeDarkMode();
     this.setupKeyboardShortcuts();
-    this.autoAuthenticate();
+    this.handleAuthCallback();
+    // Wait a bit for DOM and config to be ready
+    setTimeout(() => {
+      this.autoAuthenticate();
+    }, 100);
   }
 
   async loadConfig() {
@@ -197,38 +200,52 @@ class GitHubDiffViewer {
   }
 
   async autoAuthenticate() {
-    // Check if already authenticated
-    if (this.isAuthenticated()) {
-      console.log("✅ Already authenticated with GitHub");
-      return;
+    try {
+      // Check if already authenticated
+      if (this.isAuthenticated()) {
+        console.log("✅ Already authenticated with GitHub");
+        return;
+      }
+
+      console.log("🔐 Checking authentication status...");
+
+      // Wait for config to load with timeout
+      let configWaitTime = 0;
+      while (!this.config && configWaitTime < 5000) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        configWaitTime += 100;
+      }
+
+      if (!this.config || !this.config.GITHUB_APP_CLIENT_ID) {
+        console.log("⚠️ No GitHub App configuration found, skipping auto-auth");
+        return;
+      }
+
+      console.log("🔐 Starting automatic GitHub authentication...");
+      this.showLoading(true);
+      this.elements.loadingIndicator.querySelector("p").textContent =
+        "Authenticating with GitHub...";
+
+      // Automatically initiate OAuth
+      setTimeout(() => {
+        this.initiateOAuth();
+      }, 500);
+    } catch (error) {
+      console.error("Auto-authentication failed:", error);
     }
-
-    // Wait for config to load
-    while (!this.config) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-
-    console.log("🔐 Starting automatic GitHub authentication...");
-    this.showLoading(true);
-    this.elements.loadingIndicator.querySelector("p").textContent =
-      "Authenticating with GitHub...";
-
-    // Automatically initiate OAuth with shorter delay
-    setTimeout(() => {
-      this.initiateOAuth();
-    }, 500);
   }
 
   async exchangeCodeForToken(code) {
     try {
       console.log("Exchanging code for token...");
+      const state = sessionStorage.getItem("oauth_state");
 
-      const response = await fetch("/auth/token", {
+      const response = await fetch("/api/auth/token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, state }),
       });
 
       console.log("Token exchange response status:", response.status);
@@ -531,7 +548,7 @@ class GitHubDiffViewer {
 
     const scrollContent = document.createElement("div");
     scrollContent.className = "scroll-content";
-    scrollContent.style.width = `${this.commits.length * 450}px`;
+    scrollContent.style.width = `${this.commits.length * 550}px`;
     scrollController.appendChild(scrollContent);
 
     // Create a new structure for inline diffs
@@ -601,7 +618,7 @@ class GitHubDiffViewer {
             diffInfo.patch,
             filename,
           );
-          diffContent.innerHTML = formattedDiff;
+          diffContent.innerHTML = this.decodeHtmlEntities(formattedDiff);
           diffContent.classList.add(`diff-status-${diffInfo.status}`);
         } else {
           diffContent.innerHTML = '<div class="no-changes">No changes</div>';
@@ -1088,6 +1105,28 @@ class GitHubDiffViewer {
     const isDarkMode = document.body.classList.toggle("dark-mode");
     localStorage.setItem("darkMode", isDarkMode.toString());
     this.elements.darkModeToggle.textContent = isDarkMode ? "☀️" : "🌙";
+  }
+
+  // HTML entity decoder with safety checks
+  decodeHtmlEntities(text) {
+    if (!text || typeof text !== "string") {
+      return text;
+    }
+
+    try {
+      // Handle numeric entities directly for better results
+      text = text.replace(/&#(\d+);/g, (match, dec) => {
+        return String.fromCharCode(dec);
+      });
+
+      // Then use the textarea trick for named entities
+      const textArea = document.createElement("textarea");
+      textArea.innerHTML = text;
+      return textArea.value;
+    } catch (error) {
+      console.warn("Failed to decode HTML entities:", error);
+      return text;
+    }
   }
 
   // File collapse/expand methods

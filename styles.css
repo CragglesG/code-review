@@ -578,11 +578,15 @@ body.dark-mode .commit-meta {
 }
 
 .diff-content-inline {
-    padding: 0;
+    padding: 16px;
     background: white;
     font-size: 13px;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: visible;
     transition: background-color 0.3s ease;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
 }
 
 body.dark-mode .diff-content-inline {
@@ -752,16 +756,19 @@ body.dark-mode .diff-line-added {
 }
 
 .diff-line-removed {
-    background-color: #ffeef0;
-    color: #24292e;
-    border-left: 3px solid #d73a49;
+    background-color: #ffebe9;
+    border-left: 2px solid #d73a49;
+    border-right: 2px solid #d73a49;
     transition: all 0.3s ease;
+    box-shadow: inset 0 0 2px rgba(215, 58, 73, 0.4);
 }
 
 body.dark-mode .diff-line-removed {
-    background-color: #67060c;
-    color: #e1e4e8;
+    background-color: #4a0f12;
     border-left-color: #f85149;
+    border-right-color: #f85149;
+    border-width: 2px;
+    box-shadow: inset 0 0 3px rgba(248, 81, 73, 0.5);
 }
 
 .diff-line-context {
@@ -779,8 +786,8 @@ body.dark-mode .diff-line-context {
 /* Line numbers */
 .line-number {
     display: inline-block;
-    width: 50px;
-    padding: 4px 8px;
+    width: 35px;
+    padding: 4px 5px;
     text-align: right;
     background-color: #f8f9fa;
     border-right: 1px solid #e1e4e8;
@@ -799,12 +806,17 @@ body.dark-mode .line-number {
 }
 
 .line-number-old {
-    border-right: 1px solid #e1e4e8;
+    border-right: none;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
 }
 
 .line-number-new {
     border-right: 1px solid #e1e4e8;
     margin-right: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    background-color: #f0f2f4;
 }
 
 .diff-line-added .line-number {
@@ -825,12 +837,16 @@ body.dark-mode .diff-line-added .line-number {
     border-right-color: #d73a49;
     color: #cb2431;
     transition: all 0.3s ease;
+    border-width: 2px;
+    box-shadow: inset -1px 0 0 #d73a49;
 }
 
 body.dark-mode .diff-line-removed .line-number {
     background-color: #67060c;
     border-right-color: #f85149;
+    border-width: 2px;
     color: #ff7b72;
+    box-shadow: inset -1px 0 0 #f85149;
 }
 
 .diff-line-context .line-number {
@@ -839,9 +855,21 @@ body.dark-mode .diff-line-removed .line-number {
     transition: all 0.3s ease;
 }
 
+.diff-line-context .line-number-old {
+    border-right: none;
+}
+
+.diff-line-context .line-number-new {
+    background-color: #f0f2f4;
+}
+
 body.dark-mode .diff-line-context .line-number {
     background-color: #21262d;
     color: #8b949e;
+}
+
+body.dark-mode .diff-line-context .line-number-new {
+    background-color: #191d24;
 }
 
 /* Line prefix (+/-) */
@@ -868,9 +896,11 @@ body.dark-mode .diff-line-added .line-prefix {
 }
 
 .diff-line-removed .line-prefix {
+    background-color: #ffdce0;
     color: #d73a49;
-    background-color: #ffe3e6;
     transition: all 0.3s ease;
+    font-weight: bold;
+    border-right: 1px solid #d73a49;
 }
 
 body.dark-mode .diff-line-removed .line-prefix {
@@ -893,10 +923,11 @@ body.dark-mode .diff-line-context .line-prefix {
     padding: 4px 12px;
     flex: 1;
     white-space: pre-wrap;
-    word-break: break-all;
+    word-break: break-word;
     font-size: 13px;
     line-height: 1.4;
     overflow-wrap: break-word;
+    max-width: calc(100% - 120px);
 }
 
 /* Hunk headers */
@@ -1196,8 +1227,8 @@ body.dark-mode .success-message {
     }
 
     .commit-column {
-        min-width: 300px;
-        max-width: 350px;
+        min-width: 400px;
+        max-width: 450px;
     }
 
     .commit-header-inline {
@@ -1212,8 +1243,8 @@ body.dark-mode .success-message {
 
 @media (max-width: 480px) {
     .commit-column {
-        min-width: 280px;
-        max-width: 320px;
+        min-width: 350px;
+        max-width: 400px;
     }
 
     .file-section-header {
