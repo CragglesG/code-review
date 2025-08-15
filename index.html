@@ -56,7 +56,246 @@
                         <button id="collapseAllBtn" class="secondary-btn">
                             Collapse All
                         </button>
+                        <button id="runAiDetectionBtn" class="secondary-btn">
+                            🤖 AI Detection
+                        </button>
                     </div>
+                </div>
+
+                <div id="aiDetection" class="ai-detection hidden">
+                    <h3>🤖 AI Usage Detection</h3>
+
+                    <!-- Summary and control row -->
+                    <div
+                        style="
+                            display: flex;
+                            gap: 12px;
+                            align-items: center;
+                            margin-bottom: 12px;
+                        "
+                    >
+                        <div
+                            id="aiDetectionResults"
+                            class="ai-results"
+                            style="flex: 1"
+                        >
+                            <div class="ai-summary">
+                                <span id="aiOverallStatus" class="ai-status"
+                                    >⚪ Not Run</span
+                                >
+                                <span id="aiSummaryText"
+                                    >Click "AI Detection" to analyze
+                                    commits</span
+                                >
+                            </div>
+                        </div>
+
+                        <!-- Quick settings access -->
+                        <div
+                            style="display: flex; gap: 8px; align-items: center"
+                        >
+                            <button
+                                id="openAiSettingsBtnSmall"
+                                class="secondary-btn"
+                                title="Open AI settings"
+                            >
+                                ⚙️
+                            </button>
+                            <button
+                                id="runAiNowBtn"
+                                class="secondary-btn"
+                                title="Run AI Detection now"
+                            >
+                                Run
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Settings panel (hidden by default) -->
+                    <div
+                        id="aiSettings"
+                        class="ai-settings-panel hidden"
+                        style="
+                            margin-top: 12px;
+                            background: rgba(0, 0, 0, 0.03);
+                            padding: 12px;
+                            border-radius: 8px;
+                        "
+                    >
+                        <h4 style="margin: 0 0 8px 0">AI Detection Settings</h4>
+
+                        <div
+                            style="
+                                display: grid;
+                                grid-template-columns: 1fr 120px;
+                                gap: 8px;
+                                align-items: center;
+                                margin-bottom: 8px;
+                            "
+                        >
+                            <label for="setting_min_block_lines"
+                                >Min block lines</label
+                            >
+                            <input
+                                id="setting_min_block_lines"
+                                type="number"
+                                min="2"
+                                value="6"
+                            />
+                        </div>
+
+                        <div
+                            style="
+                                display: grid;
+                                grid-template-columns: 1fr 120px;
+                                gap: 8px;
+                                align-items: center;
+                                margin-bottom: 8px;
+                            "
+                        >
+                            <label for="setting_duplicate_threshold"
+                                >Duplicate groups -> warn</label
+                            >
+                            <input
+                                id="setting_duplicate_threshold"
+                                type="number"
+                                min="1"
+                                value="2"
+                            />
+                        </div>
+
+                        <div
+                            style="
+                                display: grid;
+                                grid-template-columns: 1fr 120px;
+                                gap: 8px;
+                                align-items: center;
+                                margin-bottom: 8px;
+                            "
+                        >
+                            <label for="setting_bigram_ratio_warn"
+                                >Bigram ratio (warn)</label
+                            >
+                            <input
+                                id="setting_bigram_ratio_warn"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="1"
+                                value="0.03"
+                            />
+                        </div>
+
+                        <div
+                            style="
+                                display: grid;
+                                grid-template-columns: 1fr 120px;
+                                gap: 8px;
+                                align-items: center;
+                                margin-bottom: 8px;
+                            "
+                        >
+                            <label for="setting_bigram_ratio_fail"
+                                >Bigram ratio (fail)</label
+                            >
+                            <input
+                                id="setting_bigram_ratio_fail"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="1"
+                                value="0.08"
+                            />
+                        </div>
+
+                        <div
+                            style="
+                                display: grid;
+                                grid-template-columns: 1fr 120px;
+                                gap: 8px;
+                                align-items: center;
+                                margin-bottom: 8px;
+                            "
+                        >
+                            <label for="setting_entropy_warn"
+                                >Entropy (warn)</label
+                            >
+                            <input
+                                id="setting_entropy_warn"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value="3.0"
+                            />
+                        </div>
+
+                        <div
+                            style="
+                                display: grid;
+                                grid-template-columns: 1fr 120px;
+                                gap: 8px;
+                                align-items: center;
+                                margin-bottom: 12px;
+                            "
+                        >
+                            <label for="setting_entropy_fail"
+                                >Entropy (fail)</label
+                            >
+                            <input
+                                id="setting_entropy_fail"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value="2.5"
+                            />
+                        </div>
+
+                        <div
+                            style="
+                                display: flex;
+                                gap: 8px;
+                                justify-content: flex-end;
+                            "
+                        >
+                            <button
+                                id="saveAiSettingsBtn"
+                                class="secondary-btn"
+                            >
+                                Save
+                            </button>
+                            <button
+                                id="resetAiSettingsBtn"
+                                class="secondary-btn"
+                            >
+                                Reset
+                            </button>
+                            <button
+                                id="closeAiSettingsBtn"
+                                class="secondary-btn"
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <p
+                            style="
+                                margin-top: 8px;
+                                font-size: 12px;
+                                color: #586069;
+                            "
+                        >
+                            Tip: These settings control sensitivity of AI
+                            detection heuristics. Adjust them to reduce false
+                            positives.
+                        </p>
+                    </div>
+
+                    <!-- Checks results -->
+                    <div
+                        id="aiChecks"
+                        class="ai-checks"
+                        style="margin-bottom: 12px"
+                    ></div>
                 </div>
 
                 <div id="diffMatrix" class="diff-matrix hidden">

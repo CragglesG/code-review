@@ -6,6 +6,16 @@ class GitHubDiffViewer {
     this.files = new Set();
     this.diffData = new Map();
     this.config = null;
+    // AI settings with sensible defaults. These are stored in memory and updated by the settings panel.
+    this.aiSettings = {
+      minBlockLines: 6, // minimal contiguous added lines to consider a block
+      duplicateThreshold: 2, // minimal duplicate occurrences to consider suspicious
+      bigramWarn: 0.03, // bigram ratio -> warning
+      bigramFail: 0.08, // bigram ratio -> fail
+      entropyWarn: 3.0, // entropy -> warning
+      entropyFail: 2.5, // entropy -> fail
+      jaccardThreshold: 0.75, // cross-file Jaccard similarity threshold
+    };
     this.initializeElements();
     this.bindEvents();
     this.initializeDarkMode();
@@ -97,6 +107,34 @@ class GitHubDiffViewer {
       refreshBtn: document.getElementById("refreshBtn"),
       expandAllBtn: document.getElementById("expandAllBtn"),
       collapseAllBtn: document.getElementById("collapseAllBtn"),
+      runAiDetectionBtn: document.getElementById("runAiDetectionBtn"),
+      aiDetection: document.getElementById("aiDetection"),
+      aiDetectionResults: document.getElementById("aiDetectionResults"),
+      aiOverallStatus: document.getElementById("aiOverallStatus"),
+      aiSummaryText: document.getElementById("aiSummaryText"),
+      aiChecks: document.getElementById("aiChecks"),
+      // Settings UI elements
+      openAiSettingsBtn: document.getElementById("openAiSettingsBtn"),
+      openAiSettingsBtnSmall: document.getElementById("openAiSettingsBtnSmall"),
+      runAiNowBtn: document.getElementById("runAiNowBtn"),
+      saveAiSettingsBtn: document.getElementById("saveAiSettingsBtn"),
+      resetAiSettingsBtn: document.getElementById("resetAiSettingsBtn"),
+      closeAiSettingsBtn: document.getElementById("closeAiSettingsBtn"),
+      // Settings inputs
+      setting_min_block_lines: document.getElementById(
+        "setting_min_block_lines",
+      ),
+      setting_duplicate_threshold: document.getElementById(
+        "setting_duplicate_threshold",
+      ),
+      setting_bigram_ratio_warn: document.getElementById(
+        "setting_bigram_ratio_warn",
+      ),
+      setting_bigram_ratio_fail: document.getElementById(
+        "setting_bigram_ratio_fail",
+      ),
+      setting_entropy_warn: document.getElementById("setting_entropy_warn"),
+      setting_entropy_fail: document.getElementById("setting_entropy_fail"),
       diffMatrix: document.getElementById("diffMatrix"),
       diffTable: document.getElementById("diffTable"),
     };
@@ -118,6 +156,147 @@ class GitHubDiffViewer {
     this.elements.collapseAllBtn.addEventListener("click", () =>
       this.collapseAllFiles(),
     );
+
+    // AI Detection controls
+    this.elements.runAiDetectionBtn.addEventListener("click", () =>
+      this.runAiDetection(),
+    );
+
+    // Open main settings panel
+    if (this.elements.openAiSettingsBtn) {
+      this.elements.openAiSettingsBtn.addEventListener("click", () => {
+        const panel =
+          document.getElementById("aiSettings") ||
+          document.getElementById("aiSettingsPanel") ||
+          document.getElementById("aiSettingsPanel");
+        if (panel) panel.classList.toggle("hidden");
+      });
+    }
+
+    // Small quick-open settings button
+    if (this.elements.openAiSettingsBtnSmall) {
+      this.elements.openAiSettingsBtnSmall.addEventListener("click", () => {
+        const panel =
+          document.getElementById("aiSettings") ||
+          document.getElementById("aiSettingsPanel");
+        if (panel) panel.classList.remove("hidden");
+      });
+    }
+
+    // Quick run button inside the summary area
+    if (this.elements.runAiNowBtn) {
+      this.elements.runAiNowBtn.addEventListener("click", () =>
+        this.runAiDetection(),
+      );
+    }
+
+    // Settings save / reset / close handlers (persist in-memory)
+    if (this.elements.saveAiSettingsBtn) {
+      this.elements.saveAiSettingsBtn.addEventListener("click", () => {
+        try {
+          const s = this.aiSettings || {};
+          const minBlock = parseInt(
+            this.elements.setting_min_block_lines?.value ||
+              s.minBlockLines ||
+              6,
+            10,
+          );
+          const dupThresh = parseInt(
+            this.elements.setting_duplicate_threshold?.value ||
+              s.duplicateThreshold ||
+              2,
+            10,
+          );
+          const bigramWarn = parseFloat(
+            this.elements.setting_bigram_ratio_warn?.value ||
+              s.bigramWarn ||
+              0.03,
+          );
+          const bigramFail = parseFloat(
+            this.elements.setting_bigram_ratio_fail?.value ||
+              s.bigramFail ||
+              0.08,
+          );
+          const entropyWarn = parseFloat(
+            this.elements.setting_entropy_warn?.value || s.entropyWarn || 3.0,
+          );
+          const entropyFail = parseFloat(
+            this.elements.setting_entropy_fail?.value || s.entropyFail || 2.5,
+          );
+
+          this.aiSettings = {
+            ...s,
+            minBlockLines: Number.isNaN(minBlock) ? s.minBlockLines : minBlock,
+            duplicateThreshold: Number.isNaN(dupThresh)
+              ? s.duplicateThreshold
+              : dupThresh,
+            bigramWarn: Number.isNaN(bigramWarn) ? s.bigramWarn : bigramWarn,
+            bigramFail: Number.isNaN(bigramFail) ? s.bigramFail : bigramFail,
+            entropyWarn: Number.isNaN(entropyWarn)
+              ? s.entropyWarn
+              : entropyWarn,
+            entropyFail: Number.isNaN(entropyFail)
+              ? s.entropyFail
+              : entropyFail,
+          };
+
+          // Reflect saved settings to UI summary
+          if (this.elements.aiSummaryText) {
+            this.elements.aiSummaryText.textContent = `AI settings updated. Click Run to re-analyze.`;
+          }
+        } catch (err) {
+          console.warn("Failed to save AI settings:", err);
+        }
+      });
+    }
+
+    if (this.elements.resetAiSettingsBtn) {
+      this.elements.resetAiSettingsBtn.addEventListener("click", () => {
+        // reset to defaults in memory and UI
+        this.aiSettings = {
+          minBlockLines: 6,
+          duplicateThreshold: 2,
+          bigramWarn: 0.03,
+          bigramFail: 0.08,
+          entropyWarn: 3.0,
+          entropyFail: 2.5,
+          jaccardThreshold: 0.75,
+        };
+        // Update UI inputs if present
+        if (this.elements.setting_min_block_lines)
+          this.elements.setting_min_block_lines.value =
+            this.aiSettings.minBlockLines;
+        if (this.elements.setting_duplicate_threshold)
+          this.elements.setting_duplicate_threshold.value =
+            this.aiSettings.duplicateThreshold;
+        if (this.elements.setting_bigram_ratio_warn)
+          this.elements.setting_bigram_ratio_warn.value =
+            this.aiSettings.bigramWarn;
+        if (this.elements.setting_bigram_ratio_fail)
+          this.elements.setting_bigram_ratio_fail.value =
+            this.aiSettings.bigramFail;
+        if (this.elements.setting_entropy_warn)
+          this.elements.setting_entropy_warn.value =
+            this.aiSettings.entropyWarn;
+        if (this.elements.setting_entropy_fail)
+          this.elements.setting_entropy_fail.value =
+            this.aiSettings.entropyFail;
+
+        if (this.elements.aiSummaryText) {
+          this.elements.aiSummaryText.textContent =
+            "AI settings reset to defaults.";
+        }
+      });
+    }
+
+    if (this.elements.closeAiSettingsBtn) {
+      this.elements.closeAiSettingsBtn.addEventListener("click", () => {
+        const panel =
+          document.getElementById("aiSettings") ||
+          document.getElementById("aiSettingsPanel");
+        if (panel) panel.classList.add("hidden");
+      });
+    }
 
     // Handle Enter key in repo input
     this.elements.repoInput.addEventListener("keypress", (e) => {
@@ -408,11 +587,12 @@ class GitHubDiffViewer {
       return;
     }
 
-    // Clean up existing scroll controllers
+    // Clean up existing scroll controllers and hide AI detection
     const existingControllers = document.querySelectorAll(
       ".commits-horizontal-scroll",
     );
     existingControllers.forEach((controller) => controller.remove());
+    this.elements.aiDetection.classList.add("hidden");
 
     const repoInfo = this.parseRepoUrl(repoUrl);
     if (!repoInfo) {
@@ -440,6 +620,9 @@ class GitHubDiffViewer {
 
       // Load commits and diffs
       await this.loadCommitsAndDiffs();
+
+      // Show AI detection button now that data is loaded
+      this.elements.runAiDetectionBtn.style.display = "inline-block";
     } catch (error) {
       console.error("Error loading repository:", error);
 
@@ -1235,8 +1418,711 @@ class GitHubDiffViewer {
             this.toggleDarkMode();
           }
           break;
+        case "a":
+        case "A":
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            this.runAiDetection();
+          }
+          break;
       }
     });
+  }
+
+  // AI Detection Methods
+  async runAiDetection() {
+    if (!this.commits || this.commits.length === 0) {
+      this.showError("No commits loaded. Please load a repository first.");
+      return;
+    }
+
+    // Disable the trigger button while analysis runs
+    if (this.elements.runAiDetectionBtn) {
+      this.elements.runAiDetectionBtn.disabled = true;
+      this.elements.runAiDetectionBtn.textContent = "🔍 Analyzing...";
+    }
+
+    try {
+      // Ensure the AI detection panel is visible before running checks
+      if (this.elements.aiDetection) {
+        this.elements.aiDetection.classList.remove("hidden");
+      }
+
+      // Run the checks and display results (panel remains open)
+      const checks = await this.performAiChecks();
+      this.displayAiResults(checks);
+    } catch (error) {
+      console.error("AI detection error:", error);
+      this.showError("Failed to run AI detection: " + error.message);
+    } finally {
+      if (this.elements.runAiDetectionBtn) {
+        this.elements.runAiDetectionBtn.disabled = false;
+        this.elements.runAiDetectionBtn.textContent = "🤖 AI Detection";
+      }
+    }
+  }
+
+  async performAiChecks() {
+    // Run existing checks and newly added AI heuristics
+    const checks = [
+      await this.checkVerboseComments(),
+      await this.checkCommentDeletions(),
+      await this.checkBoilerplateDuplicates(),
+      await this.checkRepetitivePhrasing(),
+      await this.checkEntropyInComments(),
+      await this.checkCrossFileDuplicates(),
+    ];
+
+    return checks;
+  }
+
+  async checkVerboseComments() {
+    const check = {
+      id: "verbose_comments",
+      title: "Verbose Comments Analysis",
+      description:
+        "Detects unusually high comment-to-code ratios that may indicate AI-generated content",
+      status: "pass",
+      details: [],
+      metrics: {},
+    };
+
+    let totalLines = 0;
+    let totalCommentLines = 0;
+    const fileAnalysis = new Map();
+
+    // Analyze each file across all commits
+    for (const file of this.files) {
+      let fileLines = 0;
+      let fileCommentLines = 0;
+
+      for (const commit of this.commits) {
+        const key = `${file}:${commit.sha}`;
+        const diffData = this.diffData.get(key);
+
+        if (diffData && diffData.patch) {
+          const lines = diffData.patch.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("+") && !line.startsWith("+++")) {
+              const content = line.substring(1).trim();
+              if (content) {
+                fileLines++;
+                totalLines++;
+
+                // Check for various comment patterns
+                if (this.isCommentLine(content, file)) {
+                  fileCommentLines++;
+                  totalCommentLines++;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (fileLines > 0) {
+        const ratio = fileCommentLines / fileLines;
+        fileAnalysis.set(file, {
+          lines: fileLines,
+          comments: fileCommentLines,
+          ratio,
+        });
+
+        // Flag files with > 10% comments as suspicious
+        if (ratio > 0.1 && fileLines > 10) {
+          check.details.push(
+            `${file}: ${(ratio * 100).toFixed(1)}% comments (${fileCommentLines}/${fileLines} lines)`,
+          );
+        }
+      }
+    }
+
+    const overallRatio = totalLines > 0 ? totalCommentLines / totalLines : 0;
+    check.metrics = {
+      totalLines,
+      totalCommentLines,
+      overallRatio: (overallRatio * 100).toFixed(1) + "%",
+      suspiciousFiles: check.details.length,
+    };
+
+    // Determine status
+    if (overallRatio > 0.1) {
+      check.status = "fail";
+    } else if (overallRatio > 0.5 || check.details.length > 0) {
+      check.status = "warning";
+    }
+
+    return check;
+  }
+
+  async checkCommentDeletions() {
+    const check = {
+      id: "comment_deletions",
+      title: "Comment Deletion Patterns",
+      description:
+        "Detects patterns of comments being added and then quickly removed",
+      status: "pass",
+      details: [],
+      metrics: {},
+    };
+
+    let totalCommentDeletions = 0;
+    let commitsWithDeletions = 0;
+
+    for (const commit of this.commits) {
+      let commitCommentDeletions = 0;
+
+      for (const file of this.files) {
+        const key = `${file}:${commit.sha}`;
+        const diffData = this.diffData.get(key);
+
+        if (diffData && diffData.patch) {
+          const lines = diffData.patch.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("-") && !line.startsWith("---")) {
+              const content = line.substring(1).trim();
+              if (this.isCommentLine(content, file)) {
+                commitCommentDeletions++;
+                totalCommentDeletions++;
+              }
+            }
+          }
+        }
+      }
+
+      if (commitCommentDeletions > 5) {
+        commitsWithDeletions++;
+        check.details.push(
+          `${commit.sha.substring(0, 7)}: ${commitCommentDeletions} comment deletions - "${commit.commit.message.split("\n")[0]}"`,
+        );
+      }
+    }
+
+    check.metrics = {
+      totalCommentDeletions,
+      commitsWithDeletions,
+      avgDeletionsPerCommit:
+        this.commits.length > 0
+          ? (totalCommentDeletions / this.commits.length).toFixed(1)
+          : 0,
+    };
+
+    // Determine status
+    if (commitsWithDeletions > this.commits.length * 0.3) {
+      check.status = "fail";
+    } else if (commitsWithDeletions > 0 || totalCommentDeletions > 20) {
+      check.status = "warning";
+    }
+
+    return check;
+  }
+
+  //
+  // Helper: determine whether a line appears to be a comment for the given filename extension.
+  //
+  isCommentLine(content, filename) {
+    if (!content || !content.trim()) return false;
+
+    const ext = (filename || "").split(".").pop().toLowerCase();
+
+    // Language-specific comment patterns
+    switch (ext) {
+      case "js":
+      case "jsx":
+      case "ts":
+      case "tsx":
+      case "java":
+      case "c":
+      case "cpp":
+      case "cs":
+        return (
+          content.trim().startsWith("//") ||
+          content.trim().startsWith("/*") ||
+          content.includes("*/")
+        );
+
+      case "py":
+        return (
+          content.trim().startsWith("#") ||
+          content.includes('"""') ||
+          content.includes("'''")
+        );
+
+      case "html":
+      case "xml":
+        return content.includes("<!--") || content.includes("-->");
+
+      case "css":
+        return content.trim().startsWith("/*") || content.includes("*/");
+
+      case "sh":
+      case "bash":
+        return content.trim().startsWith("#");
+
+      case "sql":
+        return (
+          content.trim().startsWith("--") || content.trim().startsWith("/*")
+        );
+
+      case "rb":
+        return content.trim().startsWith("#");
+
+      case "php":
+        return (
+          content.trim().startsWith("//") ||
+          content.trim().startsWith("#") ||
+          content.trim().startsWith("/*")
+        );
+
+      default:
+        // Generic patterns
+        return (
+          content.trim().startsWith("//") ||
+          content.trim().startsWith("#") ||
+          content.trim().startsWith("/*") ||
+          content.includes("*/") ||
+          content.includes("<!--")
+        );
+    }
+  }
+
+  //
+  // Utility helpers used by new AI checks
+  //
+
+  // Normalize a block of code/text for duplicate detection: strip whitespace, collapse spacing
+  normalizeCodeBlock(block) {
+    if (!block) return "";
+    return block
+      .replace(/\r\n/g, "\n")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  // Compute n-grams for a piece of text (words)
+  computeNgrams(text, n = 2) {
+    if (!text) return {};
+    const tokens = text
+      .replace(/[^\w\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+    const map = {};
+    for (let i = 0; i <= tokens.length - n; i++) {
+      const gram = tokens.slice(i, i + n).join(" ");
+      map[gram] = (map[gram] || 0) + 1;
+    }
+    return map;
+  }
+
+  // Compute Shannon entropy (on token distribution)
+  computeEntropy(tokens) {
+    if (!tokens || tokens.length === 0) return 0;
+    const freq = {};
+    tokens.forEach((t) => (freq[t] = (freq[t] || 0) + 1));
+    const N = tokens.length;
+    let entropy = 0;
+    for (const k in freq) {
+      const p = freq[k] / N;
+      entropy -= p * Math.log2(p);
+    }
+    return entropy;
+  }
+
+  // Jaccard similarity for two token sets
+  jaccardSimilarity(aTokens, bTokens) {
+    const A = new Set(aTokens);
+    const B = new Set(bTokens);
+    const inter = [...A].filter((x) => B.has(x)).length;
+    const union = new Set([...A, ...B]).size;
+    return union === 0 ? 0 : inter / union;
+  }
+
+  //
+  // New AI checks
+  //
+
+  // 1) Boilerplate / duplicate chunk detection (exact-normalized duplicates)
+  async checkBoilerplateDuplicates() {
+    const check = {
+      id: "boilerplate_duplicates",
+      title: "Boilerplate / Duplicate Chunk Detection",
+      description:
+        "Finds identical or near-identical blocks introduced across files or commits",
+      status: "pass",
+      details: [],
+      metrics: {},
+    };
+
+    const blockMap = new Map(); // normalized -> [{file, sha, snippet}]
+    const MIN_BLOCK_LINES = this.aiSettings?.minBlockLines || 6; // minimal block length to consider
+    const MIN_DUPLICATE_OCCURRENCES = this.aiSettings?.duplicateThreshold || 2;
+
+    // Collect added contiguous blocks from diffs
+    for (const file of this.files) {
+      for (const commit of this.commits) {
+        const key = `${file}:${commit.sha}`;
+        const diffData = this.diffData.get(key);
+        if (!diffData || !diffData.patch) continue;
+
+        const lines = diffData.patch.split("\n");
+        let buffer = [];
+        for (const rawLine of lines) {
+          if (rawLine.startsWith("+") && !rawLine.startsWith("+++")) {
+            buffer.push(rawLine.substring(1));
+          } else {
+            if (buffer.length >= MIN_BLOCK_LINES) {
+              const block = buffer.join("\n");
+              const norm = this.normalizeCodeBlock(block);
+              if (!blockMap.has(norm)) blockMap.set(norm, []);
+              blockMap
+                .get(norm)
+                .push({ file, sha: commit.sha, snippet: block });
+            }
+            buffer = [];
+          }
+        }
+        // tail
+        if (buffer.length >= MIN_BLOCK_LINES) {
+          const block = buffer.join("\n");
+          const norm = this.normalizeCodeBlock(block);
+          if (!blockMap.has(norm)) blockMap.set(norm, []);
+          blockMap.get(norm).push({ file, sha: commit.sha, snippet: block });
+        }
+      }
+    }
+
+    // Identify duplicates across different files/commits
+    for (const [norm, occurrences] of blockMap.entries()) {
+      const uniqueContexts = new Set(
+        occurrences.map((o) => `${o.file}:${o.sha}`),
+      );
+      const uniqueFiles = new Set(occurrences.map((o) => o.file));
+      if (
+        occurrences.length >= MIN_DUPLICATE_OCCURRENCES &&
+        uniqueFiles.size >= 2
+      ) {
+        check.details.push(
+          `${[...uniqueFiles].slice(0, 5).join(", ")} — ${occurrences.length} occurrences`,
+        );
+      }
+    }
+
+    check.metrics.totalBlocks = blockMap.size;
+    check.metrics.duplicateBlocks = check.details.length;
+
+    if (check.details.length > 5) check.status = "fail";
+    else if (check.details.length > 0) check.status = "warning";
+
+    return check;
+  }
+
+  // 2) Repetitive phrasing (n-gram repetition) in comments/commit messages
+  async checkRepetitivePhrasing() {
+    const check = {
+      id: "repetitive_phrasing",
+      title: "Repetitive Phrasing (n-gram) Analysis",
+      description:
+        "Detects unusually repetitive n-grams in comments and commit messages",
+      status: "pass",
+      details: [],
+      metrics: {},
+    };
+
+    const ngramCounts = {};
+    let totalTokens = 0;
+    const collectText = [];
+
+    // Gather comment lines and commit messages
+    for (const file of this.files) {
+      for (const commit of this.commits) {
+        const key = `${file}:${commit.sha}`;
+        const diffData = this.diffData.get(key);
+        if (diffData && diffData.patch) {
+          const lines = diffData.patch.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("+") && !line.startsWith("+++")) {
+              const content = line.substring(1).trim();
+              if (this.isCommentLine(content, file)) {
+                collectText.push(content);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Add commit messages too
+    for (const commit of this.commits) {
+      if (commit.commit && commit.commit.message)
+        collectText.push(commit.commit.message);
+    }
+
+    const combined = collectText.join(" ");
+    const tokens = combined
+      .replace(/[^\w\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+    totalTokens = tokens.length;
+
+    // Count n-grams (bigrams and trigrams)
+    const bigrams = this.computeNgrams(combined, 2);
+    const trigrams = this.computeNgrams(combined, 3);
+
+    // Find top bigrams/trigrams
+    const topBigrams = Object.entries(bigrams)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    const topTrigrams = Object.entries(trigrams)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    // Metric: frequency of most common bigram relative to tokens
+    const mostCommonBigramFreq = topBigrams.length > 0 ? topBigrams[0][1] : 0;
+    const bigramRatio =
+      totalTokens > 0 ? mostCommonBigramFreq / totalTokens : 0;
+
+    check.metrics.totalTokens = totalTokens;
+    check.metrics.topBigrams = topBigrams
+      .map((t) => `${t[0]}(${t[1]})`)
+      .join(", ");
+    check.metrics.topTrigrams = topTrigrams
+      .map((t) => `${t[0]}(${t[1]})`)
+      .join(", ");
+    check.metrics.bigramRatio = bigramRatio.toFixed(3);
+
+    // Thresholds: flag if top bigram > 3% of tokens or many repeated trigrams
+    if (
+      bigramRatio > 0.03 ||
+      (topTrigrams.length > 0 && topTrigrams[0][1] > 5)
+    ) {
+      check.status = "warning";
+      check.details.push(`Top bigram ratio ${(bigramRatio * 100).toFixed(2)}%`);
+    }
+    if (bigramRatio > 0.08) {
+      check.status = "fail";
+    }
+
+    return check;
+  }
+
+  // 5) Entropy-based check for comments (low lexical variability)
+  async checkEntropyInComments() {
+    const check = {
+      id: "comment_entropy",
+      title: "Comment Entropy Analysis",
+      description:
+        "Detects unusually low lexical entropy in comments which can indicate formulaic or generated text",
+      status: "pass",
+      details: [],
+      metrics: {},
+    };
+
+    const tokens = [];
+
+    for (const file of this.files) {
+      for (const commit of this.commits) {
+        const key = `${file}:${commit.sha}`;
+        const diffData = this.diffData.get(key);
+        if (!diffData || !diffData.patch) continue;
+        const lines = diffData.patch.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("+") && !line.startsWith("+++")) {
+            const content = line.substring(1).trim();
+            if (this.isCommentLine(content, file)) {
+              const toks = content
+                .replace(/[^\w\s]/g, " ")
+                .split(/\s+/)
+                .filter(Boolean)
+                .map((t) => t.toLowerCase());
+              tokens.push(...toks);
+            }
+          }
+        }
+      }
+    }
+
+    const entropy = this.computeEntropy(tokens);
+    check.metrics.tokenCount = tokens.length;
+    check.metrics.entropy = entropy.toFixed(3);
+
+    // Heuristics: low entropy indicates repetitive, formulaic text.
+    const entropyWarn = this.aiSettings?.entropyWarn ?? 3.0;
+    const entropyFail = this.aiSettings?.entropyFail ?? 2.5;
+
+    if (tokens.length > 50 && entropy < entropyWarn) {
+      check.status = "warning";
+      check.details.push(`Low comment entropy: ${entropy.toFixed(2)}`);
+    }
+    if (tokens.length > 200 && entropy < entropyFail) {
+      check.status = "fail";
+    }
+
+    return check;
+  }
+
+  // 9) Cross-file near-duplicate detection (Jaccard on token sets)
+  async checkCrossFileDuplicates() {
+    const check = {
+      id: "cross_file_duplicates",
+      title: "Cross-file Near-Duplicate Detection",
+      description:
+        "Detects similar function/comment bodies across files using Jaccard token similarity",
+      status: "pass",
+      details: [],
+      metrics: {},
+    };
+
+    // Gather blocks per file (simple heuristic: consecutive added lines grouped)
+    const fileBlocks = new Map(); // file -> [normTokensString]
+    for (const file of this.files) {
+      const blocks = [];
+      for (const commit of this.commits) {
+        const key = `${file}:${commit.sha}`;
+        const diffData = this.diffData.get(key);
+        if (!diffData || !diffData.patch) continue;
+        const lines = diffData.patch.split("\n");
+        let buffer = [];
+        for (const rawLine of lines) {
+          if (rawLine.startsWith("+") && !rawLine.startsWith("+++")) {
+            buffer.push(rawLine.substring(1));
+          } else {
+            if (buffer.length >= 4) {
+              const norm = this.normalizeCodeBlock(buffer.join("\n"));
+              const tokens = norm
+                .replace(/[^\w\s]/g, " ")
+                .split(/\s+/)
+                .filter(Boolean);
+              blocks.push(tokens);
+            }
+            buffer = [];
+          }
+        }
+        if (buffer.length >= 4) {
+          const norm = this.normalizeCodeBlock(buffer.join("\n"));
+          const tokens = norm
+            .replace(/[^\w\s]/g, " ")
+            .split(/\s+/)
+            .filter(Boolean);
+          blocks.push(tokens);
+        }
+      }
+      if (blocks.length > 0) fileBlocks.set(file, blocks);
+    }
+
+    // Compare blocks across files
+    const fileList = [...fileBlocks.keys()];
+    for (let i = 0; i < fileList.length; i++) {
+      for (let j = i + 1; j < fileList.length; j++) {
+        const aBlocks = fileBlocks.get(fileList[i]);
+        const bBlocks = fileBlocks.get(fileList[j]);
+        for (const a of aBlocks) {
+          for (const b of bBlocks) {
+            const sim = this.jaccardSimilarity(a, b);
+            const jaccardThresh = this.aiSettings?.jaccardThreshold ?? 0.75;
+            if (sim > jaccardThresh) {
+              check.details.push(
+                `${fileList[i]} ~ ${fileList[j]} (similarity ${(sim * 100).toFixed(0)}%)`,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    check.metrics.filesCompared = fileList.length;
+    check.metrics.matches = check.details.length;
+
+    if (check.details.length > 5) check.status = "fail";
+    else if (check.details.length > 0) check.status = "warning";
+
+    return check;
+  }
+
+  displayAiResults(checks) {
+    // Calculate overall status
+    const failedChecks = checks.filter((c) => c.status === "fail").length;
+    const warningChecks = checks.filter((c) => c.status === "warning").length;
+
+    let overallStatus, overallMessage;
+    if (failedChecks > 0) {
+      overallStatus = "fail";
+      overallMessage = `⚠️ ${failedChecks} check(s) failed, ${warningChecks} warning(s)`;
+    } else if (warningChecks > 0) {
+      overallStatus = "warning";
+      overallMessage = `⚠️ ${warningChecks} warning(s) detected`;
+    } else {
+      overallStatus = "pass";
+      overallMessage = `✅ All checks passed`;
+    }
+
+    // Update summary
+    this.elements.aiOverallStatus.textContent = overallMessage;
+    this.elements.aiOverallStatus.className = `ai-status ${overallStatus}`;
+    this.elements.aiSummaryText.textContent = `Analyzed ${this.commits.length} commits across ${this.files.size} files`;
+
+    // Clear and populate checks
+    this.elements.aiChecks.innerHTML = "";
+
+    for (const check of checks) {
+      const checkDiv = document.createElement("div");
+      checkDiv.className = `ai-check ${check.status}`;
+
+      const icon =
+        check.status === "pass"
+          ? "✅"
+          : check.status === "warning"
+            ? "⚠️"
+            : "❌";
+      const statusText =
+        check.status === "pass"
+          ? "PASS"
+          : check.status === "warning"
+            ? "WARNING"
+            : "FAIL";
+
+      let detailsHtml = "";
+      if (check.details.length > 0) {
+        const detailsList = check.details
+          .slice(0, 5)
+          .map((detail) => `<li>${this.escapeHtml(detail)}</li>`)
+          .join("");
+        const moreText =
+          check.details.length > 5
+            ? `<li>... and ${check.details.length - 5} more</li>`
+            : "";
+        detailsHtml = `
+          <div class="ai-check-details show">
+            <strong>Details:</strong>
+            <ul>${detailsList}${moreText}</ul>
+          </div>`;
+      }
+
+      let metricsHtml = "";
+      if (Object.keys(check.metrics).length > 0) {
+        const metricsList = Object.entries(check.metrics)
+          .map(
+            ([key, value]) => `<span class="ai-metric">${key}: ${value}</span>`,
+          )
+          .join(" ");
+        metricsHtml = `<div class="ai-check-details show"><strong>Metrics:</strong> ${metricsList}</div>`;
+      }
+
+      checkDiv.innerHTML = `
+        <div class="ai-check-info">
+          <div class="ai-check-title">${check.title}</div>
+          <div class="ai-check-description">${check.description}</div>
+          ${metricsHtml}
+          ${detailsHtml}
+        </div>
+        <div class="ai-check-result">
+          <span class="ai-check-icon">${icon}</span>
+          <span>${statusText}</span>
+        </div>
+      `;
+
+      this.elements.aiChecks.appendChild(checkDiv);
+    }
   }
 }
 
