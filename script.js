@@ -7,22 +7,74 @@ class GitHubDiffViewer {
     this.diffData = new Map();
     this.config = null;
     this.initializeElements();
-    this.loadConfig();
     this.bindEvents();
     this.initializeDarkMode();
     this.setupKeyboardShortcuts();
-    this.handleAuthCallback();
-    // Wait a bit for DOM and config to be ready
-    setTimeout(() => {
-      this.autoAuthenticate();
-    }, 100);
+
+    console.log("Vercel update worked!");
+    // Load config first so auto-auth has the information it needs.
+    // After config loads, handle any OAuth callback params and then attempt auto-auth.
+    this.loadConfig()
+      .then(() => {
+        // If the page was redirected back with OAuth params, handle them first.
+        try {
+          this.handleAuthCallback();
+        } catch (err) {
+          console.warn("Error while handling auth callback:", err);
+        }
+
+        // Then attempt auto-authentication (small delay to allow UI to update).
+        setTimeout(() => {
+          this.autoAuthenticate();
+        }, 100);
+      })
+      .catch((err) => {
+        console.warn("Failed to load config before auth flow:", err);
+        // Even if config loading failed, attempt to continue gracefully.
+        try {
+          this.handleAuthCallback();
+        } catch (e) {
+          console.warn(
+            "Error while handling auth callback after config error:",
+            e,
+          );
+        }
+        setTimeout(() => {
+          this.autoAuthenticate();
+        }, 100);
+      });
   }
 
   async loadConfig() {
     try {
+      // First attempt to read an embedded config that may be injected by a server.
       const configElement = document.getElementById("github-app-config");
       if (configElement) {
         this.config = JSON.parse(configElement.textContent);
+        // Embedded config present — nothing else required.
+        return;
+      }
+
+      // Ensure config is at least an object so callers don't wait on null indefinitely.
+      this.config = {};
+
+      // As a fallback (useful for static deployments on Vercel), try fetching /api/config.
+      try {
+        const resp = await fetch("/api/config", { method: "GET" });
+        if (resp.ok) {
+          const apiConfig = await resp.json();
+          // Merge API-provided config into current config
+          this.config = { ...(this.config || {}), ...apiConfig };
+          return;
+        } else {
+          console.warn(
+            "No config returned from /api/config, status:",
+            resp.status,
+          );
+        }
+      } catch (fetchErr) {
+        // Fail quietly — the app will continue without server-provided config.
+        console.warn("Failed to fetch /api/config:", fetchErr);
       }
     } catch (error) {
       console.warn("Could not load GitHub App config:", error);
